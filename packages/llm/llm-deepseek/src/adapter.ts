@@ -87,10 +87,28 @@ export interface DeepSeekAdapterOptions {
    * `MISSING_CREDENTIAL` when no key is available anywhere.
    */
   resolveApiKey: (connection: DeepSeekConnectionOptions) => Promise<string>
-  /** Resolve the harness-home anonymous id shared with telemetry and feedback. */
-  resolveUserId: () => AnonymousUserId
+  /**
+   * Resolve the harness-home anonymous id shared with telemetry and feedback.
+   * Required only when {@link DeepSeekAdapterOptions.identity} is `deepseek`
+   * (the default), whose request headers carry it.
+   */
+  resolveUserId?: () => AnonymousUserId
   /** Resolve the current durable attachment service; absence rejects image input. */
   resolveAttachments?: () => AttachmentStore | undefined
+  /**
+   * Human-facing provider name used by {@link DeepSeekAdapter.providerInfo}
+   * and error messages. A function receives the provider route, so one adapter
+   * instance can serve several routes under distinct names. Defaults to
+   * `DeepSeek`.
+   */
+  label?: string | ((provider: string) => string)
+  /**
+   * Which request-identity headers to send beside the shared attribution
+   * baseline. `deepseek` (default) adds the `x-deepseek-harness-*` identity
+   * headers; `none` sends only the shared baseline, for an OpenAI-compatible
+   * endpoint that defines no such headers.
+   */
+  identity?: 'deepseek' | 'none'
 }
 
 /** Default maximum idle interval while an adapter stream read is outstanding. */
@@ -169,12 +187,18 @@ export function httpErrorCode(status: number, error?: WireError['error']): strin
  * map to `ABORTED`; the configured per-read idle watchdog maps to `TIMEOUT`.
  */
 export class DeepSeekAdapter extends LlmAdapter {
+  private readonly label: (provider: string) => string
+  private readonly identity: 'deepseek' | 'none'
+
   constructor(private readonly config: DeepSeekAdapterOptions) {
     super()
+    const label = config.label ?? 'DeepSeek'
+    this.label = typeof label === 'function' ? label : () => label
+    this.identity = config.identity ?? 'deepseek'
   }
 
   override providerInfo(provider: string): LlmProviderInfo {
-    return { id: provider, name: 'DeepSeek' }
+    return { id: provider, name: this.label(provider) }
   }
 
   override providerRetryPolicy(_provider: string): ResolvedRetryPolicy {
@@ -251,7 +275,7 @@ export class DeepSeekAdapter extends LlmAdapter {
       }
     }
     const apiKey = await this.config.resolveApiKey(connection)
-    const userId = this.config.resolveUserId()
+    const userId = this.identity === 'deepseek' ? this.config.resolveUserId?.() : undefined
     const consumer = new AbortController()
     const upstream = options.signal === undefined
       ? consumer.signal
@@ -277,20 +301,21 @@ export class DeepSeekAdapter extends LlmAdapter {
         yield result.value
       }
     } catch (error: unknown) {
+      const label = this.label(options.provider)
       if (timeoutOf(watchdog.signal, STREAM_IDLE_TIMEOUT_CODE) !== undefined) {
         throw new LlmError(
-          `DeepSeek stream idle timeout after ${connection.streamIdleTimeoutMs}ms`,
+          `${label} stream idle timeout after ${connection.streamIdleTimeoutMs}ms`,
           'TIMEOUT',
           { cause: error },
         )
       }
       if (options.signal?.aborted) {
-        throw new LlmError('DeepSeek request aborted by caller', 'ABORTED', { cause: error })
+        throw new LlmError(`${label} request aborted by caller`, 'ABORTED', { cause: error })
       }
       if (error instanceof LlmError) throw error
-      throw new LlmError(`DeepSeek API stream from ${connection.baseURL} failed`, 'TRANSPORT', { cause: error })
+      throw new LlmError(`${label} API stream from ${connection.baseURL} failed`, 'TRANSPORT', { cause: error })
     } finally {
-      consumer.abort('DeepSeek stream consumer stopped')
+      consumer.abort(`${this.label(options.provider)} stream consumer stopped`)
       if (!exhausted && iterator.return !== undefined) {
         try {
           await iterator.return()
@@ -306,12 +331,12 @@ export class DeepSeekAdapter extends LlmAdapter {
     signal: AbortSignal,
     connection: DeepSeekConnectionOptions,
     apiKey: string,
-    userId: AnonymousUserId,
+    userId: AnonymousUserId | undefined,
     attachments: AttachmentStore | undefined,
     onComment: () => void,
   ): AsyncIterable<StreamChunk> {
     const body = attachments === undefined
-      ? serializeRequest(options, connection.defaults)
+      ? serializeRequest(options, connection.defaults, this.label(options.provider))
       : await serializeRequestWithImages(options, {
         attachments,
         maxRequestImageBytes: connection.maxRequestImageBytes,
@@ -325,11 +350,13 @@ export class DeepSeekAdapter extends LlmAdapter {
       'content-type': 'application/json',
       'accept': 'text/event-stream',
       ...attributionHeaders(),
-      'x-deepseek-harness-user-id': String(userId),
-      ...options.sessionId !== undefined
+      ...this.identity === 'deepseek' && userId !== undefined
+        ? { 'x-deepseek-harness-user-id': String(userId) }
+        : {},
+      ...this.identity === 'deepseek' && options.sessionId !== undefined
         ? { 'x-deepseek-harness-session-id': String(options.sessionId) }
         : {},
-      ...options.purpose === 'compaction'
+      ...this.identity === 'deepseek' && options.purpose === 'compaction'
         ? { 'x-deepseek-harness-compact': '1' }
         : {},
     }
@@ -352,14 +379,14 @@ export class DeepSeekAdapter extends LlmAdapter {
       // lives on `cause`. Wrapping with the endpoint and chaining the cause
       // lets `errorChain` render the full diagnosis at every reporting boundary.
       throw new LlmError(
-        `DeepSeek API request to ${connection.baseURL} failed`,
+        `${this.label(options.provider)} API request to ${connection.baseURL} failed`,
         'TRANSPORT',
         { cause: error },
       )
     }
 
     if (!response.ok) {
-      let message = `DeepSeek API error (HTTP ${response.status})`
+      let message = `${this.label(options.provider)} API error (HTTP ${response.status})`
       let providerError: WireError['error']
       try {
         const parsed = await response.json() as WireError
@@ -378,7 +405,7 @@ export class DeepSeekAdapter extends LlmAdapter {
       })
     }
     if (!response.body) {
-      throw new LlmError('DeepSeek API returned no response body', 'EMPTY_RESPONSE')
+      throw new LlmError(`${this.label(options.provider)} API returned no response body`, 'EMPTY_RESPONSE')
     }
 
     yield* translate(parseSse(response.body, onComment))

@@ -42,25 +42,25 @@ export interface ImageSerializationOptions {
 const TOOL_RESULT_IMAGE_TEXT = 'Attached image(s) from tool result:'
 
 /** Validate the adapter-owned effort before resolving its DeepSeek wire fields. */
-function reasoningEffort(effort: NonNullable<GenerateOptions['reasoningEffort']>): 'off' | 'low' | 'high' | 'max' {
+function reasoningEffort(effort: NonNullable<GenerateOptions['reasoningEffort']>, label: string): 'off' | 'low' | 'high' | 'max' {
   if (effort === 'off' || effort === 'low' || effort === 'high' || effort === 'max') {
     return effort as 'off' | 'low' | 'high' | 'max'
   }
   throw new LlmError(
-    `DeepSeek does not support reasoning effort "${effort}"`,
+    `${label} does not support reasoning effort "${effort}"`,
     'UNSUPPORTED_REASONING_EFFORT',
   )
 }
 
 /** Resolve one legal thinking/effort pair without exposing `off` as a wire effort. */
-function resolveThinking(options: GenerateOptions, defaults: RequestDefaults): ResolvedThinking {
+function resolveThinking(options: GenerateOptions, defaults: RequestDefaults, label: string): ResolvedThinking {
   if (options.purpose === 'session-title') return { thinking: 'disabled' }
   const effort = options.reasoningEffort === undefined
     ? defaults.reasoningEffort
-    : reasoningEffort(options.reasoningEffort)
+    : reasoningEffort(options.reasoningEffort, label)
   if (defaults.thinking === 'disabled' && effort !== undefined && effort !== 'off') {
     throw new LlmError(
-      `DeepSeek deployment does not support reasoning effort "${effort}"`,
+      `${label} deployment does not support reasoning effort "${effort}"`,
       'UNSUPPORTED_REASONING_EFFORT',
     )
   }
@@ -80,9 +80,9 @@ function flattenText(blocks: ContentBlock[]): string {
 }
 
 /** Reject core image content before any text-flattening path can silently erase it. */
-function assertTextOnly(blocks: readonly ContentBlock[]): void {
+function assertTextOnly(blocks: readonly ContentBlock[], label: string): void {
   if (contentHasImage(blocks)) {
-    throw new LlmError('The DeepSeek chat-completions adapter does not support image content.', 'UNSUPPORTED_CONTENT')
+    throw new LlmError(`The ${label} chat-completions adapter does not support image content.`, 'UNSUPPORTED_CONTENT')
   }
 }
 
@@ -200,10 +200,10 @@ function serializeAssistant(message: Message): WireMessage {
  * @param messages - the harness conversation, in order.
  * @returns the wire messages; order preserved, each tool result expanded into its own entry.
  */
-export function serializeMessages(messages: Message[]): WireMessage[] {
+export function serializeMessages(messages: Message[], label = 'DeepSeek'): WireMessage[] {
   const wire: WireMessage[] = []
   for (const message of messages) {
-    assertTextOnly(message.content)
+    assertTextOnly(message.content, label)
     if (message.role === 'system') {
       wire.push({ role: 'system', content: flattenText(message.content) })
       continue
@@ -302,6 +302,7 @@ function requestWithMessages(
   options: GenerateOptions,
   messages: WireMessage[],
   defaults: RequestDefaults,
+  label = 'DeepSeek',
 ): WireRequest {
   const tools: WireTool[] | undefined = options.tools?.map(tool => ({
     type: 'function',
@@ -311,7 +312,7 @@ function requestWithMessages(
       parameters: tool.parameters,
     },
   }))
-  const resolvedThinking = resolveThinking(options, defaults)
+  const resolvedThinking = resolveThinking(options, defaults, label)
   return {
     model: options.model,
     messages,
@@ -339,14 +340,15 @@ function requestWithMessages(
 export function serializeRequest(
   options: GenerateOptions,
   defaults: RequestDefaults = {},
+  label = 'DeepSeek',
 ): WireRequest {
   const messages: WireMessage[] = []
   if (options.system !== undefined) {
     messages.push({ role: 'system', content: options.system })
   }
-  messages.push(...serializeMessages(options.messages))
+  messages.push(...serializeMessages(options.messages, label))
 
-  return requestWithMessages(options, messages, defaults)
+  return requestWithMessages(options, messages, defaults, label)
 }
 
 /**
