@@ -26,7 +26,7 @@ The wire format is the DeepSeek chat-completions format (thinking via `reasoning
         maxTokens: 64000
 ```
 
-Both plans share one `llm-volcengine-ark` settings namespace under a `providers` dict. Each profile carries the same fields as the DeepSeek adapter profile — `apiKeyEnv`, `baseURL`, `thinking`, `reasoningEffort`, `maxTokens`, `defaultContextWindow`, `models`, `streamIdleTimeoutMs`, `maxRequestImageBytes`, `retryPolicy` — with per-plan defaults for the endpoint and credential reference.
+Both plans share one `llm-volcengine-ark` settings namespace under a `providers` dict. Each profile carries the same fields as the DeepSeek adapter profile — `apiKeyEnv`, `baseURL`, `thinking`, `reasoningEffort`, `maxTokens`, `defaultContextWindow`, `models`, `streamIdleTimeoutMs`, `maxInlineRequestImageBytes`, `retryPolicy` — with per-plan defaults for the endpoint and credential reference.
 
 The plugin registers both routes at mount, each with its own adapter instance. Connection facts resolve per request over the optional `llm-volcengine-ark` user-settings section and the optional credential seam, so a changed key, endpoint, or catalog reaches the next request without a restart; the one registration-captured fact — the retry policy — re-registers its route in place when it changes.
 

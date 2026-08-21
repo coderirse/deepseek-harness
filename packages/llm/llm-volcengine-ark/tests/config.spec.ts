@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_MAX_REQUEST_IMAGE_BYTES } from '@deepseek-ai/dsh-llm-deepseek'
+import { DEFAULT_MAX_INLINE_REQUEST_IMAGE_BYTES } from '@deepseek-ai/dsh-llm-deepseek'
 import {
   AGENT_API_KEY_ENV,
   AGENT_BASE_URL,
@@ -19,21 +19,21 @@ describe('resolveProfiles', () => {
       apiKeyEnv: AGENT_API_KEY_ENV,
       maxTokens: DEFAULT_MAX_TOKENS,
       models: DEFAULT_MODELS,
-      maxRequestImageBytes: DEFAULT_MAX_REQUEST_IMAGE_BYTES,
+      maxInlineRequestImageBytes: DEFAULT_MAX_INLINE_REQUEST_IMAGE_BYTES,
     })
     expect(profiles.get('volcengine-ark-coding')).toMatchObject({
       baseURL: CODING_BASE_URL,
       apiKeyEnv: CODING_API_KEY_ENV,
       maxTokens: DEFAULT_MAX_TOKENS,
       models: DEFAULT_MODELS,
-      maxRequestImageBytes: DEFAULT_MAX_REQUEST_IMAGE_BYTES,
+      maxInlineRequestImageBytes: DEFAULT_MAX_INLINE_REQUEST_IMAGE_BYTES,
     })
   })
 
   it('applies per-plan overrides from the providers dict', () => {
     const profiles = resolveProfiles({
       providers: {
-        agent: { baseURL: 'https://gateway.example/plan', apiKeyEnv: 'CUSTOM_AGENT_KEY', maxTokens: 64000, maxRequestImageBytes: 8 * 1024 * 1024 },
+        agent: { baseURL: 'https://gateway.example/plan', apiKeyEnv: 'CUSTOM_AGENT_KEY', maxTokens: 64000, maxInlineRequestImageBytes: 8 * 1024 * 1024 },
         coding: { models: [{ id: 'deepseek-v4-flash' }] },
       },
     })
@@ -42,7 +42,7 @@ describe('resolveProfiles', () => {
       baseURL: 'https://gateway.example/plan',
       apiKeyEnv: 'CUSTOM_AGENT_KEY',
       maxTokens: 64000,
-      maxRequestImageBytes: 8 * 1024 * 1024,
+      maxInlineRequestImageBytes: 8 * 1024 * 1024,
     })
     expect(profiles.get('volcengine-ark-coding')!.models).toEqual([{ id: 'deepseek-v4-flash' }])
   })
@@ -59,9 +59,9 @@ describe('resolveProfiles', () => {
     })).toThrow(/volcengine-ark-agent.*duplicate catalog model "dup"/)
   })
 
-  it('rejects a non-positive maxRequestImageBytes', () => {
+  it('rejects a non-positive maxInlineRequestImageBytes', () => {
     expect(() => resolveProfiles({
-      providers: { agent: { maxRequestImageBytes: 0 } },
-    })).toThrow(/maxRequestImageBytes must be a positive safe integer/)
+      providers: { agent: { maxInlineRequestImageBytes: 0 } },
+    })).toThrow(/maxInlineRequestImageBytes must be a positive safe integer/)
   })
 })

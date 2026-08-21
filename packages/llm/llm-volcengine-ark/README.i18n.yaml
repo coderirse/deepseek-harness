@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/llm/llm-volcengine-ark/README.md
-README.md: e3b9e419f7628194bf53f587ec7699101af57634
-README.zh.md: 2aeeba57f5e8fc06bfbab5108f97fce6c94f19b0
+README.md: 12ce19e5117042b4d514e25bd46a0b88c31e1b6d
+README.zh.md: 02e9d5a60eee13a69c2915efc48373c2998a6839

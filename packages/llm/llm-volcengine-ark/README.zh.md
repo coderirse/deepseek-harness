@@ -9,7 +9,7 @@
 | `volcengine-ark-agent` | Volcengine Ark Agent Plan | `providers.agent` | `https://ark.cn-beijing.volces.com/api/plan/v3` |
 | `volcengine-ark-coding` | Volcengine Ark Coding Plan | `providers.coding` | `https://ark.cn-beijing.volces.com/api/coding/v3` |
 
-线上格式即 DeepSeek 的 chat-completions 格式（思考通过 `reasoning_content`、努力档位通过 `reasoning_effort`），因此本包复用 [`DeepSeekAdapter`](../llm-deepseek/README.md)，仅将提供商标签泛化、并关闭 DeepSeek 的请求身份请求头 —— 方舟不定义任何 `x-deepseek-harness-*` 请求头，且普通方舟 API Key 无法用于套餐端点，所以每个套餐各自解析自己的 Key。
+线上格式即 DeepSeek 的 chat-completions 格式（思考通过 `reasoning_content`、努力档位通过 `reasoning_effort`），因此本包复用 [`DeepSeekAdapter`](../llm-deepseek/README.zh.md)，仅将提供商标签泛化、并关闭 DeepSeek 的请求身份请求头 —— 方舟不定义任何 `x-deepseek-harness-*` 请求头，且普通方舟 API Key 无法用于套餐端点，所以每个套餐各自解析自己的 Key。
 
 ## 配置
 
@@ -26,7 +26,7 @@
         maxTokens: 64000
 ```
 
-两个套餐共享同一个 `llm-volcengine-ark` 设置命名空间下的 `providers` 字典。每个 profile 携带与 DeepSeek 适配器 profile 相同的字段 —— `apiKeyEnv`、`baseURL`、`thinking`、`reasoningEffort`、`maxTokens`、`defaultContextWindow`、`models`、`streamIdleTimeoutMs`、`maxRequestImageBytes`、`retryPolicy` —— 其中端点与凭证引用按套餐给出默认值。
+两个套餐共享同一个 `llm-volcengine-ark` 设置命名空间下的 `providers` 字典。每个 profile 携带与 DeepSeek 适配器 profile 相同的字段 —— `apiKeyEnv`、`baseURL`、`thinking`、`reasoningEffort`、`maxTokens`、`defaultContextWindow`、`models`、`streamIdleTimeoutMs`、`maxInlineRequestImageBytes`、`retryPolicy` —— 其中端点与凭证引用按套餐给出默认值。
 
 本插件在挂载时注册两条路由，每条路由各用一个适配器实例。连接事实按请求、在可选的 `llm-volcengine-ark` 用户设置段与可选的凭证接缝上解析，因此更改 Key、端点或目录会作用于下一次请求而无需重启；唯一在注册时捕获的事实 —— 重试策略 —— 变更时原地重新注册其路由。
 
