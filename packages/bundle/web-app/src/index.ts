@@ -93,7 +93,7 @@ const BROWSER_OPENER_MODULE = import.meta.resolve('open')
 const BROWSER_OPENER_PROGRAM = `
 try {
   const { default: open } = await import(${JSON.stringify(BROWSER_OPENER_MODULE)})
-  const launcher = await open(process.argv[1])
+  const launcher = await open(process.argv[1], { app: { name: 'chrome' } })
   if (process.platform === 'win32') {
     // open resolves at PowerShell spawn; keep it referenced until that launcher hands the URL to Windows.
     const code = launcher.exitCode ?? await new Promise((resolve, reject) => {
