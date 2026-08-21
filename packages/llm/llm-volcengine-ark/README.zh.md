@@ -26,7 +26,7 @@
         maxTokens: 64000
 ```
 
-两个套餐共享同一个 `llm-volcengine-ark` 设置命名空间下的 `providers` 字典。每个 profile 携带与 DeepSeek 适配器 profile 相同的字段 —— `apiKeyEnv`、`baseURL`、`thinking`、`reasoningEffort`、`maxTokens`、`defaultContextWindow`、`models`、`streamIdleTimeoutMs`、`retryPolicy` —— 其中端点与凭证引用按套餐给出默认值。
+两个套餐共享同一个 `llm-volcengine-ark` 设置命名空间下的 `providers` 字典。每个 profile 携带与 DeepSeek 适配器 profile 相同的字段 —— `apiKeyEnv`、`baseURL`、`thinking`、`reasoningEffort`、`maxTokens`、`defaultContextWindow`、`models`、`streamIdleTimeoutMs`、`maxRequestImageBytes`、`retryPolicy` —— 其中端点与凭证引用按套餐给出默认值。
 
 本插件在挂载时注册两条路由，每条路由各用一个适配器实例。连接事实按请求、在可选的 `llm-volcengine-ark` 用户设置段与可选的凭证接缝上解析，因此更改 Key、端点或目录会作用于下一次请求而无需重启；唯一在注册时捕获的事实 —— 重试策略 —— 变更时原地重新注册其路由。
 

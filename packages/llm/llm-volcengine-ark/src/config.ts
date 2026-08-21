@@ -11,7 +11,7 @@ import { resolveRetryPolicy, RetryPolicySchema } from '@deepseek-ai/dsh-llm'
 import type { RetryPolicyConfig } from '@deepseek-ai/dsh-llm'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_IDLE_TIMEOUT_MS } from '@deepseek-ai/dsh-llm-deepseek'
+import { DEFAULT_CONTEXT_WINDOW, DEFAULT_MAX_REQUEST_IMAGE_BYTES, DEFAULT_STREAM_IDLE_TIMEOUT_MS } from '@deepseek-ai/dsh-llm-deepseek'
 import type { DeepSeekCatalogModel, DeepSeekConnectionOptions } from '@deepseek-ai/dsh-llm-deepseek'
 
 /** One shipped plan: its provider route, selector label, settings key, and connection defaults. */
@@ -86,6 +86,8 @@ export interface VolcengineArkProviderProfile {
   models?: DeepSeekCatalogModel[]
   /** Maximum provider idle time while one stream read is outstanding (default five minutes). */
   streamIdleTimeoutMs?: number
+  /** Maximum accumulated base64 image payload per request (default 20 MiB). */
+  maxRequestImageBytes?: number
   /** Provider-owned model-request retry policy; omission uses normal defaults. */
   retryPolicy?: RetryPolicyConfig
 }
@@ -114,6 +116,7 @@ const profileFields = {
   defaultContextWindow: z.number().step(1).min(1).default(DEFAULT_CONTEXT_WINDOW),
   models: z.array(catalogModel).default(DEFAULT_MODELS),
   streamIdleTimeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_STREAM_IDLE_TIMEOUT_MS),
+  maxRequestImageBytes: z.number().step(1).min(1).default(DEFAULT_MAX_REQUEST_IMAGE_BYTES),
   retryPolicy: RetryPolicySchema,
 }
 
@@ -206,6 +209,10 @@ export function resolveProfiles(config: Config): Map<string, DeepSeekConnectionO
       throw new Error(`llm-volcengine-ark: provider "${definition.provider}" maxTokens must be a positive safe integer`)
     }
     const streamIdleTimeoutMs = source.streamIdleTimeoutMs ?? DEFAULT_STREAM_IDLE_TIMEOUT_MS
+    const maxRequestImageBytes = source.maxRequestImageBytes ?? DEFAULT_MAX_REQUEST_IMAGE_BYTES
+    if (!Number.isSafeInteger(maxRequestImageBytes) || maxRequestImageBytes <= 0) {
+      throw new Error(`llm-volcengine-ark: provider "${definition.provider}" maxRequestImageBytes must be a positive safe integer`)
+    }
     if (!Number.isFinite(streamIdleTimeoutMs)
       || streamIdleTimeoutMs <= 0
       || streamIdleTimeoutMs > MAX_TIMER_DELAY_MS) {
@@ -224,6 +231,7 @@ export function resolveProfiles(config: Config): Map<string, DeepSeekConnectionO
       defaultContextWindow: source.defaultContextWindow ?? DEFAULT_CONTEXT_WINDOW,
       models: resolveModels(definition.provider, source.models),
       streamIdleTimeoutMs,
+      maxRequestImageBytes,
       retryPolicy: resolveRetryPolicy(
         source.retryPolicy,
         `llm-volcengine-ark: provider "${definition.provider}" retryPolicy`,
