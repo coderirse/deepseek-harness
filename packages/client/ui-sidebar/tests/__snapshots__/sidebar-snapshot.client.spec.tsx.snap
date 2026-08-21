@@ -140,12 +140,12 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
               <span
                 class="fallbackBrandName"
               >
-                DSH Local Build
+                DSH From Stafind
               </span>
               <span
                 class="buildRevision"
               >
-                abc1234
+                究极版
               </span>
             </div>
           </span>
@@ -266,12 +266,12 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
               <span
                 class="fallbackBrandName"
               >
-                DSH Local Build
+                DSH From Stafind
               </span>
               <span
                 class="buildRevision"
               >
-                abc1234
+                究极版
               </span>
             </div>
           </span>
