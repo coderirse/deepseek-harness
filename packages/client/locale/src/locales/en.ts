@@ -31,6 +31,7 @@ export const en = {
   'expand': 'Expand',
   'back': 'Back',
   'brand.localBuild': 'DSH From Stafind',
+  'brand.edition': 'Ultimate',
   'unknown': 'Unknown',
   'none': 'None',
   'truncated': 'Truncated',

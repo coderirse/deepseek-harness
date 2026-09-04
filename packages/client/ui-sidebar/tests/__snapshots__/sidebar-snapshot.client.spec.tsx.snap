@@ -138,18 +138,14 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
               style="display: contents;"
             >
               <span
-                class="localBuildBrand"
+                class="fallbackBrandName"
               >
-                <span
-                  class="localBuildTitle"
-                >
-                  DSH From Stafind
-                </span>
-                <span
-                  class="buildVersion"
-                >
-                  1.2.3-rc.4-abc1234-dirty
-                </span>
+                DSH From Stafind
+              </span>
+              <span
+                class="buildVersion"
+              >
+                Ultimate
               </span>
             </div>
           </span>
@@ -268,18 +264,14 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
               style="display: contents;"
             >
               <span
-                class="localBuildBrand"
+                class="fallbackBrandName"
               >
-                <span
-                  class="localBuildTitle"
-                >
-                  DSH From Stafind 究极版
-                </span>
-                <span
-                  class="buildVersion"
-                >
-                  1.2.3-rc.4-abc1234-dirty
-                </span>
+                DSH From Stafind
+              </span>
+              <span
+                class="buildVersion"
+              >
+                究极版
               </span>
             </div>
           </span>
