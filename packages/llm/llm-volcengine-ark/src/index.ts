@@ -18,7 +18,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle, ResolvedRetryPolicy } from '@deepseek-ai/dsh-llm'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
-import { deepEqualJson, installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
+import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { DeepSeekAdapter } from '@deepseek-ai/dsh-llm-deepseek'
 import type { DeepSeekConnectionOptions } from '@deepseek-ai/dsh-llm-deepseek'
 import { Config, PROVIDER_DEFINITIONS, resolveProfiles } from './config.ts'
@@ -29,7 +30,7 @@ export type { ProviderDefinition, VolcengineArkProviderProfile } from './config.
 export const name = 'llm-volcengine-ark'
 export const inject = ['llm']
 
-const NS = settingsNamespace('llm-volcengine-ark')
+const NS = 'llm-volcengine-ark'
 
 export function apply(ctx: Context, config: Config): void {
   let current: () => Config = () => config
@@ -100,6 +101,9 @@ export function apply(ctx: Context, config: Config): void {
       resolveApiKey,
       label: definition.displayName,
       identity: 'none',
+      // Ark speaks the plain OpenAI-compatible wire format, so the official
+      // API's plugin-contributed extension fields never apply here.
+      prepareExtensions: () => Promise.resolve({ fields: {}, accept: () => Promise.resolve() }),
     }))
   }
 
@@ -138,10 +142,12 @@ export function apply(ctx: Context, config: Config): void {
   }
   ensureRegistrationFacts()
 
-  installSettingsSection(ctx, NS, Config, config, {
-    setSource: (source) => {
-      current = source
-    },
-    onChange: ensureRegistrationFacts,
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, NS, Config, config, {
+      setSource: (source) => {
+        current = source
+      },
+      onChange: ensureRegistrationFacts,
+    })
   })
 }

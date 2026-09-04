@@ -17,11 +17,10 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
 import LocalCredentialProvider from '@deepseek-ai/dsh-credentials-local'
-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import FileSettingsProvider from '@deepseek-ai/dsh-settings-file'
 import * as LlmVolcengineArk from '@deepseek-ai/dsh-llm-volcengine-ark'
 
-const NS = settingsNamespace('llm-volcengine-ark')
+const NS = 'llm-volcengine-ark'
 
 /** A minimal complete text generation, enough to drive the stream to a stop finish. */
 const textEvents = [
