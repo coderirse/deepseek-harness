@@ -1,6 +1,0 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-volcengine-ark-provider.md
-2026-08-14-volcengine-ark-provider.md: e8fab11b9fbe71dcb41d5090b0ccb7133a6963d6
-2026-08-14-volcengine-ark-provider.zh.md: b67a5d598abd5f768589fc0f6780af280013bbc3

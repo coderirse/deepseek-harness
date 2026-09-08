@@ -107,17 +107,6 @@
     - id: llm-pi-ai
       name: '@deepseek-ai/dsh-llm-pi-ai'
 
-    # The Volcengine Ark (火山方舟) provider, shipping DeepSeek V4 through two
-    # subscription plans as two separate provider routes: the Agent Plan
-    # (`volcengine-ark-agent`, /api/plan/v3) and the Coding Plan
-    # (`volcengine-ark-coding`, /api/coding/v3). Each plan has its own
-    # OpenAI-compatible endpoint and its own API key, so the two routes are
-    # distinct configurable providers sharing one `llm-volcengine-ark` settings
-    # namespace. Endpoints and key references default from the plugin's own
-    # schema; the web Models page overrides them per plan without a restart.
-    - id: llm-volcengine-ark
-      name: '@deepseek-ai/dsh-llm-volcengine-ark'
-
     - id: session-persistence-jsonl
       name: '@deepseek-ai/dsh-session-persistence-jsonl'
       config:
