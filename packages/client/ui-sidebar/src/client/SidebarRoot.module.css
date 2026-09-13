@@ -130,7 +130,7 @@
 .brandIdentity {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   height: 24px;
   min-width: 0;
 }
@@ -145,7 +145,7 @@
 .brandName {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   height: 24px;
   font-size: 18px;
@@ -154,9 +154,15 @@
   letter-spacing: 0.04em;
 }
 
+/* Below the sidebar's default width the badge and wordmark together exceed the
+   row, so the wordmark yields first: it ellipsizes while the badge keeps its
+   full legible box (flex: none). */
 .fallbackBrandName {
+  min-width: 0;
+  overflow: hidden;
   font-size: 17px;
   letter-spacing: 0px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -229,19 +235,22 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* Edition badge: sized to stay legible beside the wordmark inside the 24px
+   brand row. The badge keeps its box; the wordmark yields first when the row
+   is narrow (see .fallbackBrandName). */
 .buildVersion {
   flex: none;
   display: inline-flex;
   align-items: center;
-  height: 10px;
-  padding: 0 3px;
-  border-radius: 2px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 4px;
   color: var(--dsw-alias-label-primary-inverted);
   background: var(--dsw-alias-label-primary);
   font-family: var(--ds-font-family-code);
-  font-size: 6px;
-  font-weight: 500;
-  line-height: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
   white-space: nowrap;
 }
 
