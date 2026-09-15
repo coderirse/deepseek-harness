@@ -116,7 +116,7 @@ describe('SidebarRoot shell', () => {
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
     />)
 
-    expect(screen.getByText('DSH From Stafind')).toBeTruthy()
+    expect(screen.getByText('DSH From caeamer')).toBeTruthy()
     expect(screen.getByText('Ultimate')).toBeTruthy()
     expect(container.querySelector('svg')).not.toBeNull()
   })
@@ -132,7 +132,7 @@ describe('SidebarRoot shell', () => {
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
     />)
 
-    expect(screen.getByText('DSH From Stafind')).toBeTruthy()
+    expect(screen.getByText('DSH From caeamer')).toBeTruthy()
   })
 
   it('hands the region its wide flag and clamps expandSidebar to the collapsed state', () => {
