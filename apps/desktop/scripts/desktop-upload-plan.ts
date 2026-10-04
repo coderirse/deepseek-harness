@@ -12,20 +12,28 @@ import {
   desktopUpdateMetadataFilename,
   resolveDesktopUploadConfig,
 } from './desktop-auto-update-environment.mjs'
-import { desktopTargetBuildPaths } from './desktop-build-paths.mjs'
+import { desktopTargetBuildPaths, desktopTargetPlatform } from './desktop-build-paths.mjs'
 import { validateDesktopBuildVersion } from './desktop-build-version.mjs'
 
 const APP_ROOT = resolve(import.meta.dirname, '..')
 const REPOSITORY_ROOT = resolve(APP_ROOT, '..', '..')
-const TARGETS = {
-  'mac-arm64': { platform: 'darwin', arch: 'arm64', os: 'mac' },
-  'mac-x64': { platform: 'darwin', arch: 'x64', os: 'mac' },
-  'win-x64': { platform: 'win32', arch: 'x64', os: 'win' },
-} as const satisfies Record<DesktopPackageTargetName, {
-  readonly platform: NodeJS.Platform
-  readonly arch: string
-  readonly os: string
-}>
+
+/** Artifact-name OS label for one release platform, matching the electron-builder artifactName template. */
+function artifactOs(platform: NodeJS.Platform): 'linux' | 'mac' | 'win' {
+  return platform === 'darwin' ? 'mac' : platform === 'win32' ? 'win' : 'linux'
+}
+
+/**
+ * Render the Linux `${arch}` artifact-name macro the way electron-builder does: every Linux target
+ * substitutes its own native convention, not the electron-builder arch token.
+ * @param extension - Linux artifact extension naming the target.
+ * @param arch - Payload architecture of the release target.
+ * @returns The arch name electron-builder embeds in that target's artifact filename.
+ */
+export function desktopLinuxArtifactArch(extension: 'AppImage' | 'deb' | 'rpm', arch: 'arm64' | 'x64'): string {
+  if (extension === 'deb') return arch === 'x64' ? 'amd64' : 'arm64'
+  return arch === 'x64' ? 'x86_64' : 'aarch64'
+}
 
 /** One local file and its final object metadata. */
 export interface DesktopUploadArtifact {
@@ -180,10 +188,8 @@ export async function createDesktopUploadPlan(
   targetName: DesktopPackageTargetName,
   options: DesktopUploadPlanOptions = {},
 ): Promise<DesktopUploadPlan> {
-  const target = TARGETS[targetName]
-  if (target === undefined) {
-    throw new Error(`desktop upload: unsupported target ${String(targetName)}`)
-  }
+  const { platform, arch } = desktopTargetPlatform(targetName)
+  const os = artifactOs(platform)
   const environment = options.environment ?? process.env
   const repositoryRoot = options.repositoryRoot ?? REPOSITORY_ROOT
   const appRoot = options.appRoot ?? APP_ROOT
@@ -194,7 +200,7 @@ export async function createDesktopUploadPlan(
     throw new Error(`desktop upload: desktop version ${desktopVersion} does not match current dsh version ${dshVersion}`)
   }
 
-  const update = resolveDesktopUploadConfig(environment, target.platform, target.arch)
+  const update = resolveDesktopUploadConfig(environment, platform, arch)
   const buildRecord = await jsonFile(
     join(artifactsRoot, desktopBuildRecordFilename(targetName)),
     `${targetName} package completion record`,
@@ -216,7 +222,7 @@ export async function createDesktopUploadPlan(
     throw new Error(`desktop upload: ${targetName} package completion record for ${buildVersion} does not match the ${update.environment} update destination`)
   }
 
-  const metadataFilename = desktopUpdateMetadataFilename(buildVersion, target.platform)
+  const metadataFilename = desktopUpdateMetadataFilename(buildVersion, platform)
   const metadataPath = join(artifactsRoot, metadataFilename)
   let metadataValue: unknown
   try {
@@ -230,19 +236,30 @@ export async function createDesktopUploadPlan(
   if (metadataVersion !== buildVersion) {
     throw new Error(`desktop upload: ${metadataFilename} version ${metadataVersion} does not match published version ${buildVersion}`)
   }
-  if (!Array.isArray(metadata.files) || metadata.files.length !== 1) {
-    throw new Error(`desktop upload: ${metadataFilename}.files must contain exactly one target update file`)
-  }
 
-  const base = `deepseek-harness-${buildVersion}-${target.os}-${target.arch}`
-  const updaterExtension = target.platform === 'darwin' ? 'zip' : 'exe'
-  const updaterInfo = updateFileInfo(metadata.files[0], `${metadataFilename}.files[0]`, `${base}.${updaterExtension}`)
+  const base = `deepseek-harness-${buildVersion}-${os}-${arch}`
+  const linuxName = (extension: 'AppImage' | 'deb' | 'rpm'): string =>
+    `deepseek-harness-${buildVersion}-${os}-${desktopLinuxArtifactArch(extension, arch)}.${extension}`
+  const updaterExtension = platform === 'darwin' ? 'zip' : platform === 'linux' ? 'AppImage' : 'exe'
+  const updaterFilename = platform === 'linux' ? linuxName('AppImage') : `${base}.${updaterExtension}`
+  if (!Array.isArray(metadata.files)) {
+    throw new Error(`desktop upload: ${metadataFilename}.files must contain the update file list`)
+  }
+  // Linux channel metadata also lists the deb and rpm packages, so the AppImage entry is selected by name.
+  const updaterEntries = metadata.files.filter((file) => {
+    const entry = object(file, `${metadataFilename}.files[]`)
+    return (entry.url ?? entry.path) === updaterFilename
+  })
+  if (updaterEntries.length !== 1 || (platform !== 'linux' && metadata.files.length !== 1)) {
+    throw new Error(`desktop upload: ${metadataFilename}.files must reference ${updaterFilename} exactly once`)
+  }
+  const updaterInfo = updateFileInfo(updaterEntries[0], `${metadataFilename}.files[0]`, updaterFilename)
   const updaterPath = await verifyChecksummedArtifact(artifactsRoot, updaterInfo)
   const artifacts: DesktopUploadArtifact[] = []
   const binaryPrefix = update.binaryKeyPrefix
   let installerArtifact: DesktopUploadArtifact
 
-  if (target.platform === 'darwin') {
+  if (platform === 'darwin') {
     const dmgPath = await requireArtifact(artifactsRoot, `${base}.dmg`)
     const blockmapPath = await requireArtifact(artifactsRoot, `${base}.zip.blockmap`)
     installerArtifact = uploadArtifact(dmgPath, binaryPrefix, 'application/x-apple-diskimage')
@@ -250,6 +267,16 @@ export async function createDesktopUploadPlan(
       installerArtifact,
       uploadArtifact(updaterPath, binaryPrefix, 'application/zip'),
       uploadArtifact(blockmapPath, binaryPrefix, 'application/octet-stream'),
+    )
+  }
+  else if (platform === 'linux') {
+    const blockmapPath = await requireArtifact(artifactsRoot, `${updaterFilename}.blockmap`)
+    installerArtifact = uploadArtifact(updaterPath, binaryPrefix, 'application/vnd.appimage')
+    artifacts.push(installerArtifact)
+    artifacts.push(uploadArtifact(blockmapPath, binaryPrefix, 'application/octet-stream'))
+    artifacts.push(
+      uploadArtifact(await requireArtifact(artifactsRoot, linuxName('deb')), binaryPrefix, 'application/vnd.debian.binary-package'),
+      uploadArtifact(await requireArtifact(artifactsRoot, linuxName('rpm')), binaryPrefix, 'application/x-rpm'),
     )
   }
   else {
@@ -278,7 +305,9 @@ export async function createDesktopUploadPlan(
     const stableFilename = metadataFilename.replace('nightly', 'latest')
     artifacts.push({ ...channelArtifact, filename: stableFilename, key: `${update.keyPrefix}/${stableFilename}` })
   }
-  const latestFilename = `dsh-latest-${target.platform === 'darwin' ? 'macos' : 'windows'}-${target.arch}.${target.platform === 'darwin' ? 'dmg' : 'exe'}`
+  const latestFilename = platform === 'darwin' ? `dsh-latest-macos-${arch}.dmg`
+    : platform === 'linux' ? `dsh-latest-linux-${arch}.AppImage`
+      : `dsh-latest-windows-${arch}.exe`
   const latestKey = `desktop/${latestFilename}`
   return {
     environment: update.environment,

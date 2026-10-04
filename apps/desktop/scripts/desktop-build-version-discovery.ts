@@ -22,6 +22,7 @@ import { parse } from 'semver'
 import { desktopBuildVersionPrefix, validateDesktopBuildVersion } from './desktop-build-version.mjs'
 import { DESKTOP_AUTO_UPDATE_ENV, resolveDesktopUploadConfig } from './desktop-auto-update-environment.mjs'
 import { createDesktopCos, DESKTOP_COS_REGION } from './desktop-cos.ts'
+import { desktopTargetPlatform } from './desktop-build-paths.mjs'
 import type { DesktopPackageTargetName } from './package-target.ts'
 
 /** How long the whole bucket listing may take before the suggestion falls back to local artifacts. */
@@ -87,8 +88,7 @@ async function localVersions(artifactsRoot: string): Promise<string[]> {
  * @returns Versions parsed from object names, or undefined when the bucket cannot be listed completely in time.
  */
 async function remoteVersions(options: DesktopBuildVersionSuggestionOptions): Promise<string[] | undefined> {
-  const platform = options.target === 'win-x64' ? 'win32' as const : 'darwin' as const
-  const arch = options.target === 'mac-arm64' ? 'arm64' : 'x64'
+  const { platform, arch } = desktopTargetPlatform(options.target)
   // An unconfigured destination has nothing to be unique against; an invalid one must not be mistaken for it.
   if (options.environment[DESKTOP_AUTO_UPDATE_ENV] === undefined
     && options.environment.DOWNLOAD_TEST_ORIGIN === undefined) return undefined

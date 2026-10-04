@@ -4,7 +4,9 @@ import { packagingStep } from './packaging-step.mjs'
 import { spawn } from 'node:child_process'
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { delimiter, join, relative, resolve } from 'node:path'
+import { delimiter, dirname, join, relative, resolve } from 'node:path'
+import { appendFileSync } from 'node:fs'
+import { load } from 'js-yaml'
 import { desktopNodeEnvironment } from '../src/node-environment.ts'
 import { createRuntimeProjectMetadata } from '../src/project-manager.ts'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
@@ -29,7 +31,7 @@ import {
 import {
   signMacOSRuntime,
 } from './macos-runtime.ts'
-import { desktopTargetPlatform, resolveDesktopBuildTarget, resolveDesktopTargetBuildPaths } from './desktop-build-paths.mjs'
+import { desktopTargetPlatform, electronDistExecutable, resolveDesktopBuildTarget, resolveDesktopTargetBuildPaths } from './desktop-build-paths.mjs'
 import { desktopRuntimeFileExclusion } from './runtime-file-policy.ts'
 import { selectOfficeEngine } from '../../../scripts/libreoffice-packages.mjs'
 
@@ -41,13 +43,38 @@ const STORE_ROOT = join(BUILD_ROOT, 'store')
 const RUNTIME_ROOT = BUILD_PATHS.runtime
 const PNPM_BUILD_STATE = BUILD_PATHS.dshPnpm
 const PACKAGE_SET_ROOT = BUILD_PATHS.packageSet
-const NODE = join(BUILD_PATHS.electron, process.platform === 'win32' ? 'electron.exe' : 'Electron.app/Contents/MacOS/Electron')
+const NODE = join(BUILD_PATHS.electron, electronDistExecutable(desktopTargetPlatform(resolveDesktopBuildTarget()).platform))
 const PNPM = join(RUNTIME_ROOT, 'pnpm', 'bin', 'pnpm.mjs')
 
 function manifestVersion(path: string, subject: string): string {
   const manifest = JSON.parse(readFileSync(path, 'utf8')) as { version?: unknown }
   if (typeof manifest.version !== 'string') throw new Error(`desktop runtime: ${subject} has no version`)
   return manifest.version
+}
+
+/**
+ * Copy the repository's pnpm patches into the staged runtime project and declare them in its
+ * workspace file. The runtime installs from a directory outside the repository, where pnpm
+ * cannot see the root workspace, so the isolated install would silently skip every patch.
+ * @param projectDir - Staged runtime project directory holding its own pnpm-workspace.yaml.
+ */
+function stageWorkspacePatches(projectDir: string): void {
+  const repositoryRoot = resolve(APP_ROOT, '..', '..')
+  const workspace = load(readFileSync(join(repositoryRoot, 'pnpm-workspace.yaml'), 'utf8')) as {
+    patchedDependencies?: Record<string, string>
+  }
+  const patches = workspace.patchedDependencies
+  if (patches === undefined || Object.keys(patches).length === 0) return
+  for (const patchPath of Object.values(patches)) {
+    mkdirSync(dirname(join(projectDir, patchPath)), { recursive: true })
+    copyFileSync(join(repositoryRoot, patchPath), join(projectDir, patchPath))
+  }
+  const declared = Object.entries(patches)
+    .map(([name, patchPath]) => `  ${JSON.stringify(name)}: ${JSON.stringify(patchPath)}`)
+    .join('\n')
+  // The staged runtime installs a subset of the workspace graph, so workspace patches whose
+  // packages are not part of the runtime stay unused here.
+  appendFileSync(join(projectDir, 'pnpm-workspace.yaml'), `allowUnusedPatches: true\npatchedDependencies:\n${declared}\n`)
 }
 
 function desktopRelease(): DesktopRelease {
@@ -121,6 +148,7 @@ async function main(): Promise<void> {
       copyFileSync(join(PACKAGE_SET_ROOT, DESKTOP_PACKAGE_SET_FILE), join(BUILD_ROOT, DESKTOP_PACKAGE_SET_FILE))
       cpSync(join(PACKAGE_SET_ROOT, DESKTOP_PACKAGES_DIR), join(BUILD_ROOT, DESKTOP_PACKAGES_DIR), { recursive: true })
       createRuntimeProjectMetadata(BUILD_ROOT, release)
+      stageWorkspacePatches(BUILD_ROOT)
     })
     await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'runtime:lockfile', () => runPnpm(['install', '--lockfile-only']))
     verifyDesktopCoreLockfile(
@@ -129,8 +157,7 @@ async function main(): Promise<void> {
     )
     await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'runtime:install', () => runPnpm(['install', '--prod', '--frozen-lockfile', '--trust-lockfile']))
     const packageSet = readDesktopCorePackageSet(BUILD_ROOT, release.version)
-    const targetName = resolveDesktopBuildTarget()
-    const target = { platform: process.platform, arch: desktopTargetPlatform(targetName).arch }
+    const target = desktopTargetPlatform(resolveDesktopBuildTarget())
     const modules = join(BUILD_ROOT, 'node_modules')
     const officeManifest = JSON.parse(readFileSync(join(modules, '@deepseek-ai/libreoffice-kit/package.json'), 'utf8'))
     const officeEngine = selectOfficeEngine(officeManifest, target)

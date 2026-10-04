@@ -33,6 +33,7 @@ import {
   verifyMacOSAppUpdateConfig,
   writeMacOSAppUpdateConfig,
 } from './macos-app-update-config.mjs'
+import { resolveLinuxAppUpdateFeed, verifyLinuxAppUpdateConfig } from './linux-app-update-config.mjs'
 
 /**
  * Create electron-builder configuration from one release environment.
@@ -70,6 +71,8 @@ export function createElectronBuilderConfig(
   let dshDestination
   let windowsCode = []
   const unpack = ['**/*.{node,dylib,dll,so,exe}', '**/*.so.*', '**/spawn-helper', '**/@vscode/ripgrep-*/bin/rg',
+    // The static Landlock launcher has no distinguishing suffix, so name its platform-package bin directory.
+    '**/@deepseek-ai/node-addon-system-*/bin/landlock-run',
     `**/node_modules/@deepseek-ai/libreoffice-kit-${resolvedPlatform}-${resolvedArch}/**/*`]
   const windowsSigner = packagesWindows && !unsigned
     ? createWindowsTokenSigner({
@@ -194,6 +197,11 @@ export function createElectronBuilderConfig(
         preparedRuntimeVersion ?? productVersion, { platform: resolvedPlatform, arch: resolvedArch })
       // Unsigned Windows builds skip electron-builder's afterSign hook.
       if (packagesWindows && unsigned) await verifyWindowsAsarUnpack(buildPaths.dsh, resourcesDir, windowsCode)
+      // electron-builder writes the AppImage updater configuration; verify rather than rewrite it.
+      if (resolvedPlatform === 'linux' && update !== undefined
+        && !context.targets.some(target => target.name === 'dir')) {
+        await verifyLinuxAppUpdateConfig(context.appOutDir, resolveLinuxAppUpdateFeed(context.packager.config.publish))
+      }
     },
     afterSign: async context => {
       if (windowsSigner !== undefined) {
@@ -231,9 +239,24 @@ export function createElectronBuilderConfig(
       target: ['nsis'],
     },
     linux: {
+      // The brand mark is shared with the Windows icon; Linux needs no platform-specific mask.
+      icon: fileURLToPath(new URL('../resources/icon-windows.png', import.meta.url)),
       category: 'Development',
-      target: ['AppImage'],
+      // The packaged Linux executable name the CLI launcher template resolves.
+      executableName: 'deepseek-harness',
+      // Match the window's WM_CLASS to the desktop entry so taskbars associate running windows.
+      syncDesktopName: true,
+      // deb and rpm reject an empty maintainer; validation requires the dotenv value earlier.
+      maintainer: env.DSH_DESKTOP_LINUX_MAINTAINER,
+      synopsis: 'DeepSeek Harness desktop application',
+      description: 'DeepSeek Harness desktop application with a bundled dsh runtime.',
+      mimeTypes: ['x-scheme-handler/dsh'],
+      target: ['AppImage', 'deb', 'rpm'],
     },
+    // The product name carries a space, which is invalid in deb and rpm package names and breaks
+    // fpm's rpmbuild spec handling; both package formats take the sanitized executable name instead.
+    deb: { packageName: 'deepseek-harness' },
+    rpm: { packageName: 'deepseek-harness' },
     nsis: {
       installerSidebar: join(buildPaths.root, 'installer-ui', 'uninstaller-sidebar.bmp'),
       uninstallerSidebar: join(buildPaths.root, 'installer-ui', 'uninstaller-sidebar.bmp'),

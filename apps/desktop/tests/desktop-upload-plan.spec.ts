@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { load } from 'js-yaml'
-import { createDesktopUploadPlan } from '../scripts/desktop-upload-plan.ts'
+import { createDesktopUploadPlan, desktopLinuxArtifactArch } from '../scripts/desktop-upload-plan.ts'
 import { desktopUpdateMetadataFilename } from '../scripts/desktop-auto-update-environment.mjs'
 import type { DesktopPackageTargetName } from '../scripts/package-target.ts'
 import { createDesktopCos } from '../scripts/desktop-cos.ts'
@@ -48,7 +48,7 @@ async function fixture(
   await writeFile(join(repositoryRoot, 'package.json'), `${JSON.stringify({ version })}\n`)
   await writeFile(join(appRoot, 'package.json'), `${JSON.stringify({ version })}\n`)
 
-  const [os, arch] = target.split('-') as ['mac' | 'win', 'arm64' | 'x64']
+  const [os, arch] = target.split('-') as ['mac' | 'win' | 'linux', 'arm64' | 'x64']
   const base = `deepseek-harness-${version}-${os}-${arch}`
   const origin = environment === 'test'
     ? TEST_ORIGIN
@@ -70,6 +70,27 @@ async function fixture(
       version,
       path: `${base}.zip`,
       files: [{ url: `${base}.zip`, size: Buffer.byteLength(zip), sha512: digest(zip) }],
+    })}\n`)
+  }
+  else if (os === 'linux') {
+    const appImage = 'unsigned AppImage fixture'
+    const appImageName = `deepseek-harness-${version}-${os}-${desktopLinuxArtifactArch('AppImage', arch)}.AppImage`
+    await writeFile(join(artifactsRoot, appImageName), appImage)
+    const info = await createBlockmap(join(artifactsRoot, appImageName), {},
+      { info: { emitArtifactBuildCompleted: async () => {} } }, appImageName)
+    await writeFile(join(artifactsRoot, `${appImageName}.blockmap`), 'blockmap')
+    const deb = 'deb package fixture'
+    const rpm = 'rpm package fixture'
+    await writeFile(join(artifactsRoot, `deepseek-harness-${version}-${os}-${desktopLinuxArtifactArch('deb', arch)}.deb`), deb)
+    await writeFile(join(artifactsRoot, `deepseek-harness-${version}-${os}-${desktopLinuxArtifactArch('rpm', arch)}.rpm`), rpm)
+    await writeFile(join(artifactsRoot, desktopUpdateMetadataFilename(version, 'linux')), `${JSON.stringify({
+      version,
+      path: appImageName,
+      files: [
+        { url: `deepseek-harness-${version}-${os}-${desktopLinuxArtifactArch('deb', arch)}.deb`, size: Buffer.byteLength(deb), sha512: digest(deb) },
+        { url: `deepseek-harness-${version}-${os}-${desktopLinuxArtifactArch('rpm', arch)}.rpm`, size: Buffer.byteLength(rpm), sha512: digest(rpm) },
+        { url: appImageName, ...info },
+      ],
     })}\n`)
   }
   else {
@@ -263,6 +284,44 @@ describe('desktop upload plan', () => {
     expect(plan).toMatchObject({
       publicUrl: 'https://download.deepseek.com/dsh-desk/feeds/win-x64/',
       bucket: PRODUCTION_BUCKET,
+    })
+  })
+
+  it('selects the Linux AppImage updater entry among the deb and rpm channel files', async () => {
+    const paths = await fixture('linux-x64', '2.0.0', 'production')
+    const plan = await createDesktopUploadPlan('linux-x64', paths)
+    expect(plan.artifacts.map(artifact => artifact.filename)).toEqual([
+      'deepseek-harness-2.0.0-linux-x86_64.AppImage',
+      'deepseek-harness-2.0.0-linux-x86_64.AppImage.blockmap',
+      'deepseek-harness-2.0.0-linux-amd64.deb',
+      'deepseek-harness-2.0.0-linux-x86_64.rpm',
+      'nightly-linux.yml',
+      'latest-linux.yml',
+    ])
+    expect(plan.artifacts[0]).toMatchObject({ contentType: 'application/vnd.appimage' })
+    expect(plan.artifacts[2]).toMatchObject({ contentType: 'application/vnd.debian.binary-package' })
+    expect(plan.artifacts[3]).toMatchObject({ contentType: 'application/x-rpm' })
+    expect(load(plan.artifacts[4]!.contents!)).toMatchObject({
+      files: [{ url: 'https://download.deepseek.com/dsh-desk/bin/linux-x64/deepseek-harness-2.0.0-linux-x86_64.AppImage' }],
+    })
+  })
+
+  it('renders each Linux target arch with its native artifact convention', () => {
+    expect(desktopLinuxArtifactArch('AppImage', 'x64')).toBe('x86_64')
+    expect(desktopLinuxArtifactArch('AppImage', 'arm64')).toBe('aarch64')
+    expect(desktopLinuxArtifactArch('deb', 'x64')).toBe('amd64')
+    expect(desktopLinuxArtifactArch('deb', 'arm64')).toBe('arm64')
+    expect(desktopLinuxArtifactArch('rpm', 'x64')).toBe('x86_64')
+    expect(desktopLinuxArtifactArch('rpm', 'arm64')).toBe('aarch64')
+  })
+
+  it.each(['linux-x64', 'linux-arm64'] as const)('publishes the %s fixed AppImage download without feed metadata', async (target) => {
+    const paths = await fixture(target)
+    const plan = await createDesktopUploadPlan(target, { ...paths, latest: true })
+    expect(plan.artifacts).toHaveLength(1)
+    expect(plan.artifacts[0]).toMatchObject({
+      key: `desktop/dsh-latest-${target}.AppImage`,
+      channelMetadata: false,
     })
   })
 
