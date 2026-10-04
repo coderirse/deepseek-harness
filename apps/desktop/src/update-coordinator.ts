@@ -51,7 +51,10 @@ export class DesktopUpdateCoordinator {
     private readonly publish: (state: DesktopUpdateState) => DesktopUpdateState,
     private readonly beforeRestart: () => Promise<boolean>,
     private readonly updater: AppUpdater = autoUpdater,
-    private readonly enabled: () => boolean = () => app.isPackaged && existsSync(join(process.resourcesPath, 'app-update.yml')),
+    private readonly enabled: () => boolean = () => app.isPackaged && existsSync(join(process.resourcesPath, 'app-update.yml'))
+      // electron-updater's Linux updater is the AppImageUpdater, which refuses to run outside an AppImage
+      // install; deb and rpm users update through their package managers.
+      && (process.platform !== 'linux' || process.env.APPIMAGE !== undefined),
     private readonly currentVersion: () => string = () => app.getVersion(),
     private readonly downloadResult?: (success: boolean, reason?: string) => void,
   ) {

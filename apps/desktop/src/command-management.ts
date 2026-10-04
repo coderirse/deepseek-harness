@@ -171,7 +171,7 @@ export class DesktopCommandManager {
 
   private async inspect(): Promise<CommandState> {
     const state = await this.worker('inspect')
-    if (process.platform !== 'darwin') return state
+    if (process.platform === 'win32') return state
     try {
       return { ...state, ...await shellCommand() }
     } catch {
@@ -188,6 +188,15 @@ export class DesktopCommandManager {
     }
     if (this.options.isInstalling()) {
       await this.options.show({ type: 'info', title: messages.cliCommandTitle, message: messages.cliCommandUpdating, buttons: [messages.cliCommandClose] })
+      return
+    }
+    // The AppImage mount disappears when the application closes, so a registered command would point
+    // into a gone mount; deb and rpm installs have stable launcher paths.
+    if (process.platform === 'linux' && process.env.APPIMAGE !== undefined) {
+      await this.options.show({
+        type: 'info', title: messages.cliCommandTitle,
+        message: messages.cliCommandAppImageUnsupported, buttons: [messages.cliCommandClose],
+      })
       return
     }
     try {

@@ -1,5 +1,6 @@
 /** User decisions cross a real worker process; the worker replaces only the OS mutation boundary. */
 
+import { existsSync } from 'node:fs'
 import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -30,7 +31,7 @@ vi.mock('node:child_process', async (importOriginal) => {
   return { ...actual, execFile: Object.assign(vi.fn(), { [promisify.custom]: invoke }) }
 })
 
-afterEach(() => { external.shell = null; external.cancelAuthorization = false; external.elevations = 0 })
+afterEach(() => { vi.unstubAllEnvs(); external.shell = null; external.cancelAuthorization = false; external.elevations = 0 })
 
 async function fixture(options: {
   failure?: string
@@ -56,7 +57,7 @@ async function fixture(options: {
     directory: root, launcher: join(root, 'desktop-dsh'),
     activeCommand: options.managed && !options.shadowed ? join(root, process.platform === 'win32' ? 'dsh.cmd' : 'dsh') : join(root, 'other-dsh'),
   }
-  if (process.platform === 'darwin') {
+  if (process.platform !== 'win32') {
     const shell = join(root, 'lookup-shell')
     await writeFile(shell, '#!/bin/sh\nprintf "\\0DSH_COMMAND\\0"\ncat "$(dirname "$0")/selected-command"\nprintf "\\0"\n', { mode: 0o755 })
     await writeFile(join(root, 'selected-command'), state.activeCommand + '\n')
@@ -87,7 +88,7 @@ async function fixture(options: {
   })
   const calls = async (): Promise<Array<{ operation: string; expected?: string }>> =>
     (await readFile(join(worker, 'calls.jsonl'), 'utf8')).trim().split('\n').map(line => JSON.parse(line) as { operation: string; expected?: string })
-  return { manager, show, calls }
+  return { manager, show, calls, worker }
 }
 
 it('requires confirmation before replacing an existing command', async () => {
@@ -159,4 +160,16 @@ it('coalesces repeated menu clicks and keeps update preparation waiting for the 
   await Promise.all([first, waiting])
   expect(idle).toBe(true)
   expect(await f.calls()).toEqual([{ operation: 'inspect' }])
+})
+
+it.skipIf(process.platform !== 'linux')('explains that an AppImage install cannot register the command', async () => {
+  vi.stubEnv('APPIMAGE', '/tmp/deepseek-harness-test.AppImage')
+  const f = await fixture()
+  f.show.mockResolvedValue({ response: 0, checkboxChecked: false })
+  await f.manager.show()
+  expect(f.show).toHaveBeenCalledTimes(1)
+  expect(f.show.mock.calls[0]![0]).toMatchObject({
+    type: 'info', message: en.cliCommandAppImageUnsupported, buttons: [en.cliCommandClose],
+  })
+  expect(existsSync(join(f.worker, 'calls.jsonl'))).toBe(false)
 })
