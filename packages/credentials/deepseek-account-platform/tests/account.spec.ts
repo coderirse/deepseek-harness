@@ -954,9 +954,9 @@ it('derives the client headers independently for profile, balance, and logout ca
   ])
 })
 
-it('rejects unsupported native desktop platforms in configuration', () => {
-  // @ts-expect-error Configuration files can name unsupported operating systems.
-  expect(() => Config({ desktopPlatform: 'linux' })).toThrow()
+it('accepts desktop-linux as a native desktop platform in configuration', () => {
+  const config = Config({ desktopPlatform: 'linux' })
+  expect(config.desktopPlatform).toBe('linux')
 })
 
 it('retains successful profile data on current failure only for the same credential', async () => {
