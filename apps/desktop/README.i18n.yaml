@@ -6,11 +6,11 @@
   en: 0f0f6ea914eff51e
   zh: 4934245b04e9f1c0
 /deepseek-harness-desktop/terminal-command:
-  en: bef92953c237363f
-  zh: d21d6effd21b8c00
+  en: d24d57f5d6f6a4ac
+  zh: 8ea0bcc93eda9843
 /deepseek-harness-desktop/closing-the-window-and-quitting:
-  en: c323e02e3f0305fe
-  zh: 3c730db632136443
+  en: 474116103ff70645
+  zh: 24249054a1a06573
 /deepseek-harness-desktop/key-technical-decisions:
   en: 069fdfd72d2ea26a
   zh: 76ae549d43c99bb4
@@ -42,14 +42,14 @@
   en: 4cd8a8da6977928d
   zh: 9f624855a2edac37
 /deepseek-harness-desktop/package/release-versions:
-  en: 0324169124c4414c
-  zh: f591bee485467e93
+  en: 337375041e017e82
+  zh: 354e193efd285184
 /deepseek-harness-desktop/package/runtime-file-selection:
   en: f0e345fd89868803
   zh: fd2c775ad23fa2f0
 /deepseek-harness-desktop/package/upload-updates:
-  en: 72073b2e72590067
-  zh: 63b1f9790395c37d
+  en: c45d8e8162d3762a
+  zh: e4619a7018c85f30
 /deepseek-harness-desktop/package/unsigned-windows-test-installer:
   en: cfd5780dd26a8e46
   zh: f7a16b1ede793b7b
@@ -60,11 +60,11 @@
   en: 8efe3498dbe8686d
   zh: a88c16f20a9430f3
 /deepseek-harness-desktop/updates:
-  en: d0df867b69cbffa4
-  zh: eeb47b79b86fe5ee
+  en: ac25dad915165f6f
+  zh: b0e508f5a801b7a5
 /deepseek-harness-desktop/updates/mandatory-update-policy:
-  en: c00a0e7d32056ba9
-  zh: a76dae44cb513d6f
+  en: 43847fe7c4810722
+  zh: 8d5d87c217c23977
 /deepseek-harness-desktop/updates/local-updater-qualification:
   en: bc50fd8a4d96c227
   zh: fb0a6ce80c31cda6
@@ -72,8 +72,8 @@
   en: 0b225f914142ef0b
   zh: 9ffd07768d37824e
 /deepseek-harness-desktop/known-limitations:
-  en: 5b77213c86bbcfb6
-  zh: b34bf21773bb852b
+  en: 5cbf6da9467c8c76
+  zh: 52d34b485106ee31
 /deepseek-harness-desktop/dev-note:
   en: 8e26b460ba31f21b
   zh: fbcd0307b3867125
